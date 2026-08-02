@@ -1,4 +1,4 @@
-import { Download, Plus, Search, ShieldCheck, Upload } from 'lucide-react';
+import { Download, Plus, Search, Settings, ShieldCheck, Upload } from 'lucide-react';
 import type { ModelTag } from '../types';
 
 interface HeaderProps {
@@ -10,6 +10,7 @@ interface HeaderProps {
   onNewPrompt: () => void;
   onExport: () => void;
   onImport: (file: File) => void;
+  onOpenSettings: () => void;
 }
 
 export function Header({
@@ -21,6 +22,7 @@ export function Header({
   onNewPrompt,
   onExport,
   onImport,
+  onOpenSettings,
 }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 border-b border-vault-border/80 bg-vault-base/88 backdrop-blur-xl">
@@ -66,6 +68,14 @@ export function Header({
                 }}
               />
             </label>
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="inline-flex items-center gap-2 rounded-xl border border-vault-border bg-vault-surface px-3 py-2 text-sm font-semibold text-slate-200 transition hover:border-vault-orange hover:text-vault-orange-soft"
+            >
+              <Settings className="h-4 w-4" aria-hidden="true" />
+              Settings
+            </button>
             <button
               type="button"
               onClick={onNewPrompt}

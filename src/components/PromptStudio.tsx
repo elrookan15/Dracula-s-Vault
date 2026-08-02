@@ -46,6 +46,14 @@ import {
   XML_TAGS,
   type XmlTag,
 } from '../utils/promptTransforms';
+import {
+  type ApiSettings,
+  type ChatMessage,
+  hasCredential,
+  providerForModel,
+  providerMeta,
+  runChat,
+} from '../utils/providers';
 import { createId, extractVariables, interpolatePrompt } from '../utils/promptUtils';
 import { translatePrompt, translationTargets, type TargetFormat } from '../utils/translators';
 import { TokenHud } from './studio/TokenHud';
@@ -90,9 +98,11 @@ const tabs: TabDefinition[] = [
 interface PromptStudioProps {
   prompt: PromptTemplate | null;
   isOpen: boolean;
+  apiSettings: ApiSettings;
   onClose: () => void;
   onCopy: (text: string) => void;
   onSaveFork: (title: string, promptText: string, model: ModelTag) => void;
+  onOpenSettings: () => void;
 }
 
 const actionButton =
@@ -102,7 +112,7 @@ const primaryButton =
 const limeButton =
   'inline-flex items-center gap-2 rounded-xl bg-vault-lime px-3 py-2 text-sm font-black text-vault-base shadow-lime transition hover:bg-vault-lime-soft';
 
-export function PromptStudio({ prompt, isOpen, onClose, onCopy, onSaveFork }: PromptStudioProps) {
+export function PromptStudio({ prompt, isOpen, apiSettings, onClose, onCopy, onSaveFork, onOpenSettings }: PromptStudioProps) {
   const [activeTab, setActiveTab] = useState<StudioTab>('frameworks');
   const [workingText, setWorkingText] = useState('');
   const [model, setModel] = useState<ModelTag>('GPT-4o');
@@ -197,7 +207,15 @@ export function PromptStudio({ prompt, isOpen, onClose, onCopy, onSaveFork }: Pr
             {activeTab === 'persona' && <PersonaTab onAppend={append} />}
             {activeTab === 'fewshot' && <FewShotTab onAppend={append} />}
             {activeTab === 'pipeline' && <PipelineTab onGenerate={setWorkingText} subject={prompt.title} />}
-            {activeTab === 'sandbox' && <SandboxTab workingText={workingText} variables={variables} />}
+            {activeTab === 'sandbox' && (
+              <SandboxTab
+                workingText={workingText}
+                variables={variables}
+                model={model}
+                settings={apiSettings}
+                onOpenSettings={onOpenSettings}
+              />
+            )}
             {activeTab === 'versions' && <VersionsTab original={prompt.prompt} workingText={workingText} />}
             {activeTab === 'evaluate' && <EvaluateTab workingText={workingText} />}
             {activeTab === 'compress' && <CompressTab workingText={workingText} onApply={setWorkingText} />}
@@ -756,41 +774,114 @@ function PipelineTab({ onGenerate, subject }: { onGenerate: (text: string) => vo
 }
 
 interface ChatTurn {
-  role: 'system' | 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'error';
   content: string;
 }
 
-function SandboxTab({ workingText, variables }: { workingText: string; variables: string[] }) {
+function SandboxTab({
+  workingText,
+  variables,
+  model,
+  settings,
+  onOpenSettings,
+}: {
+  workingText: string;
+  variables: string[];
+  model: ModelTag;
+  settings: ApiSettings;
+  onOpenSettings: () => void;
+}) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [userMessage, setUserMessage] = useState('');
   const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const [liveMode, setLiveMode] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
 
   const systemPrompt = useMemo(() => interpolatePrompt(workingText, values), [workingText, values]);
+  const provider = providerForModel(model);
+  const keyReady = hasCredential(model, settings);
 
-  function send() {
-    if (!userMessage.trim()) {
+  function simulate(message: string): string {
+    return [
+      '[Simulated response — enable Live mode with a saved API key to call a real model]',
+      '',
+      `System instructions: ${systemPrompt.length} chars. Your message: "${message}".`,
+      `Variables in play: ${variables.length ? variables.join(', ') : 'none'}.`,
+    ].join('\n');
+  }
+
+  async function send() {
+    const message = userMessage.trim();
+    if (!message || isRunning) {
       return;
     }
-    const simulated = [
-      '[Simulated response — PromptVault Studio does not call a live model]',
-      '',
-      `Given the system instructions (${systemPrompt.length} chars) and your message, a compliant model would respond here.`,
-      `Detected variables in play: ${variables.length ? variables.join(', ') : 'none'}.`,
-    ].join('\n');
-
-    setTurns((current) => [
-      ...current,
-      { role: 'user', content: userMessage.trim() },
-      { role: 'assistant', content: simulated },
-    ]);
     setUserMessage('');
+
+    const history: ChatMessage[] = turns
+      .filter((turn): turn is ChatTurn & { role: 'user' | 'assistant' } => turn.role !== 'error')
+      .map((turn) => ({ role: turn.role, content: turn.content }));
+
+    setTurns((current) => [...current, { role: 'user', content: message }]);
+
+    if (!liveMode) {
+      setTurns((current) => [...current, { role: 'assistant', content: simulate(message) }]);
+      return;
+    }
+
+    setIsRunning(true);
+    try {
+      const reply = await runChat({
+        model,
+        system: systemPrompt,
+        messages: [...history, { role: 'user', content: message }],
+        settings,
+      });
+      setTurns((current) => [...current, { role: 'assistant', content: reply }]);
+    } catch (error) {
+      setTurns((current) => [
+        ...current,
+        { role: 'error', content: error instanceof Error ? error.message : 'Request failed.' },
+      ]);
+    } finally {
+      setIsRunning(false);
+    }
   }
 
   return (
     <div className="space-y-4">
       <div>
         <h3 className="text-lg font-black text-white">Test Sandbox</h3>
-        <p className="text-sm text-slate-400">Simulate a chat turn against the canvas system prompt. Responses are mocked locally.</p>
+        <p className="text-sm text-slate-400">
+          Send a chat turn against the canvas system prompt. Simulated by default; enable Live mode to call the real
+          provider with your saved key.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-vault-border bg-vault-surface/70 p-3">
+        <label className="flex items-center gap-2 text-sm font-bold text-slate-200">
+          <input
+            type="checkbox"
+            checked={liveMode}
+            onChange={(event) => setLiveMode(event.target.checked)}
+            className="h-4 w-4 accent-vault-lime"
+          />
+          Live mode
+        </label>
+        <span className="text-xs text-slate-500">
+          Routes to <span className="font-black text-vault-purple-soft">{providerMeta[provider].label}</span> ({model})
+        </span>
+        {liveMode &&
+          (keyReady ? (
+            <span className="rounded-full bg-vault-lime/10 px-2 py-0.5 text-xs font-black text-vault-lime">key ready</span>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="rounded-full bg-vault-orange/10 px-2 py-0.5 text-xs font-black text-vault-orange-soft underline decoration-dotted"
+            >
+              add key in Settings
+            </button>
+          ))}
       </div>
 
       {variables.length > 0 && (
@@ -815,13 +906,18 @@ function SandboxTab({ workingText, variables }: { workingText: string; variables
           <div
             key={index}
             className={`rounded-xl px-3 py-2 text-sm ${
-              turn.role === 'user' ? 'bg-vault-orange/10 text-vault-orange-soft' : 'bg-vault-lime/10 text-slate-200'
+              turn.role === 'user'
+                ? 'bg-vault-orange/10 text-vault-orange-soft'
+                : turn.role === 'error'
+                  ? 'bg-red-500/10 text-red-300'
+                  : 'bg-vault-lime/10 text-slate-200'
             }`}
           >
             <span className="mr-2 text-xs font-black uppercase">{turn.role}</span>
             <span className="whitespace-pre-wrap">{turn.content}</span>
           </div>
         ))}
+        {isRunning && <p className="px-3 text-sm text-slate-500">Calling {providerMeta[provider].label}…</p>}
       </div>
 
       <div className="flex gap-2">
@@ -836,8 +932,8 @@ function SandboxTab({ workingText, variables }: { workingText: string; variables
           placeholder="Type a user message…"
           className="flex-1 rounded-xl border border-vault-border bg-vault-surface px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-vault-orange"
         />
-        <button type="button" className={primaryButton} onClick={send}>
-          Send
+        <button type="button" className={primaryButton} onClick={send} disabled={isRunning}>
+          {isRunning ? 'Running…' : 'Send'}
         </button>
       </div>
     </div>

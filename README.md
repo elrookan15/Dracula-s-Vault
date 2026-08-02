@@ -12,6 +12,7 @@ PromptVault Studio is a dark, cyber-professional React SPA for managing, searchi
 - Architecture Lab with a guided 7-pass prompt engineering builder and branch snapshots.
 - Prompt Studio workspace with 13 tools: framework scaffolding (RTCC/CRISPE/STCO/TCREI/ReAct/ToT), XML structural tagging, meta-prompt self-refinement, multi-model translation (Claude/OpenAI/Gemini/Ollama), anti-slop and hallucination guardrails, persona calibration, few-shot builder, multi-pass pipeline, a mock test sandbox, version diffing, an LLM-as-judge quality rubric, context compression, and multi-format/agent-file export.
 - Token counter + cost/context-window HUD with per-model estimates.
+- Bring-Your-Own-Key (BYOK) settings drawer: store OpenAI, Anthropic, Google Gemini, and DeepSeek keys (plus a local Ollama URL) encrypted at rest in the browser, and run the Studio test sandbox live directly against the selected provider.
 - Variable engine supporting both `[VARIABLE_NAME]` and `{{variable}}` syntaxes.
 - LocalStorage persistence with guarded JSON import validation, falling back to in-memory session state when a sandboxed origin blocks storage.
 - Responsive dark UI using Vite, React, TypeScript, Tailwind CSS, and lucide-react.

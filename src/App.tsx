@@ -6,9 +6,12 @@ import { Header } from './components/Header';
 import { PromptCard } from './components/PromptCard';
 import { PromptEditorModal } from './components/PromptEditorModal';
 import { PromptStudio } from './components/PromptStudio';
+import { SettingsDrawer } from './components/SettingsDrawer';
 import { VariableModal } from './components/VariableModal';
 import { categories, modelTags } from './data/seedPrompts';
+import { useApiSettings } from './hooks/useApiSettings';
 import { usePromptVault } from './hooks/usePromptVault';
+import type { ApiSettings } from './utils/providers';
 import type { ModelTag, PromptCategoryId, PromptFormValues, PromptTemplate } from './types';
 import { copyToClipboard, downloadJson, extractVariables } from './utils/promptUtils';
 
@@ -27,6 +30,8 @@ function App() {
   const [studioPrompt, setStudioPrompt] = useState<PromptTemplate | null>(null);
   const [editingPrompt, setEditingPrompt] = useState<PromptTemplate | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const { settings: apiSettings, saveSettings, clearSettings } = useApiSettings();
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<number | null>(null);
 
@@ -132,6 +137,16 @@ function App() {
     }
   }
 
+  function handleSaveSettings(next: ApiSettings) {
+    void saveSettings(next);
+    showToast('API keys saved to this browser.');
+  }
+
+  function handleClearSettings() {
+    clearSettings();
+    showToast('API keys cleared.');
+  }
+
   return (
     <main className="min-h-screen bg-vault-radial text-slate-100">
       <Header
@@ -146,6 +161,7 @@ function App() {
         }}
         onExport={handleExport}
         onImport={handleImport}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
       <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -262,9 +278,20 @@ function App() {
       <PromptStudio
         prompt={studioPrompt}
         isOpen={Boolean(studioPrompt)}
+        apiSettings={apiSettings}
         onClose={() => setStudioPrompt(null)}
         onCopy={handleCopy}
         onSaveFork={handleStudioSaveFork}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
+
+      <SettingsDrawer
+        isOpen={isSettingsOpen}
+        settings={apiSettings}
+        isPersistent={isPersistent}
+        onClose={() => setIsSettingsOpen(false)}
+        onSave={handleSaveSettings}
+        onClear={handleClearSettings}
       />
 
       <PromptEditorModal

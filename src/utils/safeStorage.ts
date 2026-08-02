@@ -4,6 +4,7 @@ export interface VaultStorage {
   isPersistent: boolean;
   getItem: (key: string) => string | null;
   setItem: (key: string, value: string) => void;
+  removeItem: (key: string) => void;
 }
 
 /**
@@ -36,6 +37,9 @@ export function createVaultStorage(): VaultStorage {
       setItem: (key, value) => {
         memoryStorage.set(key, value);
       },
+      removeItem: (key) => {
+        memoryStorage.delete(key);
+      },
     };
   }
 
@@ -54,6 +58,14 @@ export function createVaultStorage(): VaultStorage {
         persistentStorage.setItem(key, value);
       } catch {
         // Quota or permission failures mid-session keep the in-memory copy only.
+      }
+    },
+    removeItem: (key) => {
+      memoryStorage.delete(key);
+      try {
+        persistentStorage.removeItem(key);
+      } catch {
+        // Ignore removal failures in restricted environments.
       }
     },
   };
