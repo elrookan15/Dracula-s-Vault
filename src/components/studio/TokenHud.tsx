@@ -34,6 +34,7 @@ export function TokenHud({ text, model, onModelChange }: TokenHudProps) {
         </div>
         <select
           value={model}
+          aria-label="Cost estimate model"
           onChange={(event) => onModelChange(event.target.value as ModelTag)}
           className="rounded-lg border border-vault-border bg-vault-surface px-2 py-1 text-xs font-bold text-slate-100 focus:border-vault-orange"
         >
