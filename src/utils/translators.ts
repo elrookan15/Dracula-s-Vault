@@ -79,13 +79,14 @@ export function translatePrompt(prompt: PromptTemplate, target: TargetFormat, us
       );
 
     case 'ollama':
+      const ollamaSystem = system.replace(/"""/g, '\\"\\"\\"');
       return [
         `FROM ${slugModel(prompt)}`,
         '',
         'PARAMETER temperature 0.7',
         '',
         'SYSTEM """',
-        system,
+        ollamaSystem,
         '"""',
       ].join('\n');
 
