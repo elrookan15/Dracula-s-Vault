@@ -150,15 +150,17 @@ export function parsePromptImport(json: string): PromptImportResult {
       ? parsed.prompts
       : isRecord(parsed) && Array.isArray(parsed.customPrompts)
         ? parsed.customPrompts
-        : parsed;
+        : isRecord(parsed)
+          ? []
+          : parsed;
 
   if (!Array.isArray(payload)) {
     throw new Error('Import failed: expected an array of prompts or an object with a prompts array.');
   }
 
   const validPrompts = payload.filter(isPromptTemplate);
-  if (validPrompts.length === 0) {
-    throw new Error('Import failed: no valid prompt templates were found.');
+  if (validPrompts.length === 0 && favoriteIds.length === 0) {
+    throw new Error('Import failed: no valid prompt templates or favorite IDs were found.');
   }
 
   return {

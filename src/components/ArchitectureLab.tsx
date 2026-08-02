@@ -30,14 +30,26 @@ export function ArchitectureLab() {
     setValues((current) => ({ ...current, [stepId]: value }));
   }
 
+  function snapshotValues(snapshot: Record<string, string>) {
+    setBranches((current) => {
+      const nextBranch: LabBranch = {
+        id: createId('branch'),
+        name: `V${current.length + 1}`,
+        values: snapshot,
+        createdAt: new Date().toISOString(),
+      };
+      return [nextBranch, ...current];
+    });
+  }
+
   function forkBranch() {
-    const nextBranch: LabBranch = {
-      id: createId('branch'),
-      name: `V${branches.length + 1}`,
-      values,
-      createdAt: new Date().toISOString(),
-    };
-    setBranches((current) => [nextBranch, ...current]);
+    snapshotValues(values);
+  }
+
+  function restoreBranch(branch: LabBranch) {
+    // Snapshot the current unsaved draft before overwriting it so it stays recoverable.
+    snapshotValues(values);
+    setValues(branch.values);
   }
 
   return (
@@ -100,7 +112,7 @@ export function ArchitectureLab() {
                   <button
                     key={branch.id}
                     type="button"
-                    onClick={() => setValues(branch.values)}
+                    onClick={() => restoreBranch(branch)}
                     className="flex w-full items-center justify-between rounded-xl border border-vault-border bg-vault-surface px-3 py-2 text-left text-sm text-slate-300 transition hover:border-vault-lime hover:text-vault-lime"
                   >
                     <span className="inline-flex items-center gap-2">

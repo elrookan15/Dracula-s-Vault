@@ -2,6 +2,7 @@ import { Save, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { categories, modelTags } from '../data/seedPrompts';
 import type { PromptCategoryId, PromptFormValues, PromptTemplate } from '../types';
+import { useModalFocus } from '../hooks/useModalFocus';
 
 interface PromptEditorModalProps {
   prompt: PromptTemplate | null;
@@ -24,6 +25,7 @@ export function PromptEditorModal({ prompt, isOpen, onClose, onSave }: PromptEdi
   const [form, setForm] = useState<PromptFormValues>(emptyForm);
   const [tagInput, setTagInput] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
+  const modalRef = useModalFocus<HTMLDivElement>(isOpen, onClose);
 
   useEffect(() => {
     if (prompt) {
@@ -75,8 +77,8 @@ function handleSubmit(event: import('react').FormEvent<HTMLFormElement>) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <button className="absolute inset-0 cursor-default" type="button" aria-label="Close editor" onClick={onClose} />
+    <div ref={modalRef} className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+      <button className="absolute inset-0 cursor-default" type="button" aria-label="Close editor" onClick={onClose} tabIndex={-1} />
       <form
         ref={formRef}
         onSubmit={handleSubmit}

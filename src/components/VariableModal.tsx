@@ -1,6 +1,7 @@
 import { Copy, Download, X, Zap } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { PromptTemplate } from '../types';
+import { useModalFocus } from '../hooks/useModalFocus';
 import { extractVariables, highlightedPromptParts, interpolatePrompt, downloadJson } from '../utils/promptUtils';
 
 interface VariableModalProps {
@@ -15,6 +16,7 @@ export function VariableModal({ prompt, isOpen, onClose, onCopy }: VariableModal
   const variables = useMemo(() => (prompt ? extractVariables(prompt.prompt) : []), [prompt]);
   const finalPrompt = useMemo(() => (prompt ? interpolatePrompt(prompt.prompt, values) : ''), [prompt, values]);
   const previewParts = useMemo(() => (prompt ? highlightedPromptParts(prompt.prompt, values) : []), [prompt, values]);
+  const modalRef = useModalFocus<HTMLDivElement>(isOpen, onClose);
 
   useEffect(() => {
     setValues({});
@@ -46,8 +48,8 @@ export function VariableModal({ prompt, isOpen, onClose, onCopy }: VariableModal
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <button className="absolute inset-0 cursor-default" type="button" aria-label="Close drawer" onClick={onClose} />
+    <div ref={modalRef} className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm" role="dialog" aria-modal="true">
+      <button className="absolute inset-0 cursor-default" type="button" aria-label="Close drawer" onClick={onClose} tabIndex={-1} />
       <section className="relative flex h-full w-full max-w-3xl flex-col border-l border-vault-border bg-vault-base shadow-2xl">
         <div className="border-b border-vault-border bg-vault-surface/90 p-5">
           <div className="flex items-start justify-between gap-4">
