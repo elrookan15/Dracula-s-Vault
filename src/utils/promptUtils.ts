@@ -48,10 +48,23 @@ export function extractVariables(prompt: string): string[] {
   return [...variables].sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * Reads a variable value by name without hitting inherited object properties.
+ * A variable such as `{{constructor}}` or `{{toString}}` would otherwise resolve
+ * to a function on `Object.prototype` and crash the subsequent `.trim()`.
+ */
+function readVariableValue(values: Record<string, string>, name: string): string | undefined {
+  if (!Object.prototype.hasOwnProperty.call(values, name)) {
+    return undefined;
+  }
+  const value = values[name];
+  return typeof value === 'string' ? value.trim() : undefined;
+}
+
 export function interpolatePrompt(prompt: string, values: Record<string, string>): string {
   return prompt.replace(COMBINED_VARIABLE_PATTERN, (raw, bracket: string | undefined, curly: string | undefined) => {
     const name = bracket ?? curly;
-    const value = name ? values[name]?.trim() : undefined;
+    const value = name ? readVariableValue(values, name) : undefined;
     return value ? value : raw;
   });
 }
@@ -65,7 +78,7 @@ export function highlightedPromptParts(prompt: string, values: Record<string, st
       parts.push({ text: prompt.slice(lastIndex, match.index), kind: 'static' });
     }
 
-    const value = values[match.name]?.trim();
+    const value = readVariableValue(values, match.name);
     parts.push({ text: value || match.raw, kind: value ? 'value' : 'variable' });
     lastIndex = match.index + match.raw.length;
   }

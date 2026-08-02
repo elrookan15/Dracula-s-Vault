@@ -1,4 +1,5 @@
 import type { ModelTag, PromptTemplate } from '../types';
+import { toYamlFlowSequence, toYamlScalar } from './yaml';
 
 export type CopyFormat = 'raw' | 'interpolated' | 'apiPayload' | 'markdown';
 
@@ -24,7 +25,14 @@ export function toApiPayload(prompt: PromptTemplate, content: string): string {
   );
 }
 
+/** Chooses a fence longer than any backtick run inside the content (min 3). */
+function markdownFence(content: string): string {
+  const longestRun = [...content.matchAll(/`+/g)].reduce((max, match) => Math.max(max, match[0].length), 0);
+  return '`'.repeat(Math.max(3, longestRun + 1));
+}
+
 export function toMarkdownDoc(prompt: PromptTemplate, content: string): string {
+  const fence = markdownFence(content);
   return [
     `# ${prompt.title}`,
     '',
@@ -37,9 +45,9 @@ export function toMarkdownDoc(prompt: PromptTemplate, content: string): string {
     '',
     '## Prompt',
     '',
-    '```text',
+    `${fence}text`,
     content,
-    '```',
+    fence,
   ].join('\n');
 }
 
@@ -82,8 +90,8 @@ export function buildAgentFile(format: AgentFileFormat, config: AgentFileConfig)
       .filter(Boolean);
     const frontMatter = [
       '---',
-      `description: Standing orders for ${config.projectName || 'this project'}`,
-      `globs: ${globs.length ? `[${globs.map((glob) => `"${glob}"`).join(', ')}]` : '[]'}`,
+      `description: ${toYamlScalar(`Standing orders for ${config.projectName || 'this project'}`)}`,
+      `globs: ${toYamlFlowSequence(globs)}`,
       'alwaysApply: false',
       '---',
     ].join('\n');

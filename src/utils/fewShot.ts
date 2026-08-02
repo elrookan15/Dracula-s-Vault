@@ -1,4 +1,5 @@
 import { createId } from './promptUtils';
+import { toYamlScalar } from './yaml';
 
 export type FewShotFormat = 'json' | 'yaml' | 'markdown';
 
@@ -10,10 +11,6 @@ export interface Exemplar {
 
 export function createExemplar(): Exemplar {
   return { id: createId('shot'), input: '', output: '' };
-}
-
-function yamlEscape(value: string): string {
-  return value.includes('\n') || value.includes(':') ? JSON.stringify(value) : value;
 }
 
 export function formatExemplars(exemplars: Exemplar[], format: FewShotFormat): string {
@@ -32,7 +29,7 @@ export function formatExemplars(exemplars: Exemplar[], format: FewShotFormat): s
 
   if (format === 'yaml') {
     return filled
-      .map((example) => `- input: ${yamlEscape(example.input)}\n  output: ${yamlEscape(example.output)}`)
+      .map((example) => `- input: ${toYamlScalar(example.input)}\n  output: ${toYamlScalar(example.output)}`)
       .join('\n');
   }
 

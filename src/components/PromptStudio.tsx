@@ -1038,6 +1038,10 @@ function CompressTab({ workingText, onApply }: { workingText: string; onApply: (
 function ExportTab({ prompt, onCopy }: { prompt: PromptTemplate; onCopy: (text: string) => void }) {
   const [agentFormat, setAgentFormat] = useState<AgentFileFormat>('cursorrules');
   const [config, setConfig] = useState({ projectName: '', standards: 'Use TypeScript strict mode\nWrite tests for new logic', globs: 'src/**/*.ts' });
+  const [values, setValues] = useState<Record<string, string>>({});
+
+  const variables = useMemo(() => extractVariables(prompt.prompt), [prompt.prompt]);
+  const interpolated = useMemo(() => interpolatePrompt(prompt.prompt, values), [prompt.prompt, values]);
 
   const copyFormats: Array<{ id: CopyFormat; label: string }> = [
     { id: 'raw', label: 'Raw Text' },
@@ -1068,13 +1072,33 @@ function ExportTab({ prompt, onCopy }: { prompt: PromptTemplate; onCopy: (text: 
         <p className="text-sm text-slate-400">Copy the canvas in several formats or generate an IDE agent rules file.</p>
       </div>
 
+      {variables.length > 0 && (
+        <div className="rounded-2xl border border-vault-border bg-vault-surface/70 p-3">
+          <p className="mb-2 text-xs font-black uppercase tracking-widest text-vault-purple-soft">
+            Variable values (for Interpolated / API / Markdown)
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {variables.map((variable) => (
+              <label key={variable} className="block">
+                <span className="mb-1 block font-mono text-xs font-black text-vault-purple-soft">{variable}</span>
+                <input
+                  value={values[variable] ?? ''}
+                  onChange={(event) => setValues((current) => ({ ...current, [variable]: event.target.value }))}
+                  className="w-full rounded-lg border border-vault-border bg-vault-base px-2 py-1.5 text-sm text-slate-100 focus:border-vault-purple"
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         {copyFormats.map((format) => (
           <button
             key={format.id}
             type="button"
             className={actionButton}
-            onClick={() => onCopy(buildCopyPayload(prompt, format.id, prompt.prompt))}
+            onClick={() => onCopy(buildCopyPayload(prompt, format.id, interpolated))}
           >
             <Copy className="h-4 w-4" aria-hidden="true" />
             {format.label}
