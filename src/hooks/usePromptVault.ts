@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { seedPrompts } from '../data/seedPrompts';
 import type { PromptFormValues, PromptTemplate } from '../types';
-import { createPromptFromValues, parsePromptImport } from '../utils/promptUtils';
+import { createPromptFromValues, isPromptTemplate, parsePromptImport } from '../utils/promptUtils';
 
 const STORAGE_KEY = 'promptvault-studio:vault';
 
@@ -24,7 +24,7 @@ function readStoredVault(): StoredVault {
   try {
     const parsed = JSON.parse(raw) as Partial<StoredVault>;
     return {
-      customPrompts: Array.isArray(parsed.customPrompts) ? parsed.customPrompts.filter(Boolean) : [],
+      customPrompts: Array.isArray(parsed.customPrompts) ? parsed.customPrompts.filter(isPromptTemplate) : [],
       favoriteIds: Array.isArray(parsed.favoriteIds)
         ? parsed.favoriteIds.filter((id): id is string => typeof id === 'string')
         : [],
@@ -105,12 +105,16 @@ export function usePromptVault() {
   function importPrompts(json: string) {
     const imported = parsePromptImport(json);
     setStoredVault((current) => {
-      const importedIds = new Set(imported.map((prompt) => prompt.id));
+      const importedIds = new Set(imported.prompts.map((prompt) => prompt.id));
+      const nextFavorites = new Set([...current.favoriteIds, ...imported.favoriteIds]);
       const retained = current.customPrompts.filter((prompt) => !importedIds.has(prompt.id));
-      return { ...current, customPrompts: [...imported, ...retained] };
+      return {
+        customPrompts: [...imported.prompts, ...retained],
+        favoriteIds: [...nextFavorites],
+      };
     });
 
-    return imported.length;
+    return imported.prompts.length;
   }
 
   function exportVault() {
@@ -118,7 +122,8 @@ export function usePromptVault() {
       {
         version: 1,
         exportedAt: new Date().toISOString(),
-        prompts: prompts.map((prompt) => ({ ...prompt, isCustom: prompt.isCustom || prompt.id.startsWith('seed-') })),
+        favoriteIds: storedVault.favoriteIds,
+        prompts,
       },
       null,
       2,

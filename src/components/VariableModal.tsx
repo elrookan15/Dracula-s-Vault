@@ -24,6 +24,8 @@ export function VariableModal({ prompt, isOpen, onClose, onCopy }: VariableModal
     return null;
   }
 
+  const activePrompt = prompt;
+
   function updateVariable(variable: string, value: string) {
     setValues((current) => ({ ...current, [variable]: value }));
   }
@@ -31,8 +33,8 @@ export function VariableModal({ prompt, isOpen, onClose, onCopy }: VariableModal
   function exportExecution() {
     const payload = JSON.stringify(
       {
-        promptId: prompt.id,
-        title: prompt.title,
+        promptId: activePrompt.id,
+        title: activePrompt.title,
         values,
         finalPrompt,
         exportedAt: new Date().toISOString(),
@@ -44,7 +46,7 @@ export function VariableModal({ prompt, isOpen, onClose, onCopy }: VariableModal
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${prompt.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-execution.json`;
+    link.download = `${activePrompt.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-execution.json`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -90,7 +92,7 @@ export function VariableModal({ prompt, isOpen, onClose, onCopy }: VariableModal
                     <textarea
                       value={values[variable] ?? ''}
                       onChange={(event) => updateVariable(variable, event.target.value)}
-                      placeholder={`Enter ${variable.toLowerCase().replaceAll('_', ' ')}`}
+                      placeholder={`Enter ${variable.toLowerCase().replace(/_/g, ' ')}`}
                       className="min-h-24 w-full resize-y rounded-2xl border border-vault-border bg-vault-surface px-3 py-3 text-sm text-slate-100 transition placeholder:text-slate-600 focus:border-vault-purple"
                     />
                   </label>

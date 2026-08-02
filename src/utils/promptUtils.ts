@@ -95,7 +95,12 @@ export function isPromptTemplate(value: unknown): value is PromptTemplate {
   );
 }
 
-export function parsePromptImport(json: string): PromptTemplate[] {
+export interface PromptImportResult {
+  prompts: PromptTemplate[];
+  favoriteIds: string[];
+}
+
+export function parsePromptImport(json: string): PromptImportResult {
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
@@ -103,7 +108,17 @@ export function parsePromptImport(json: string): PromptTemplate[] {
     throw new Error('Import failed: JSON is malformed.');
   }
 
-  const payload = isRecord(parsed) && Array.isArray(parsed.prompts) ? parsed.prompts : parsed;
+  const favoriteIds =
+    isRecord(parsed) && Array.isArray(parsed.favoriteIds)
+      ? parsed.favoriteIds.filter((id): id is string => typeof id === 'string')
+      : [];
+  const payload =
+    isRecord(parsed) && Array.isArray(parsed.prompts)
+      ? parsed.prompts
+      : isRecord(parsed) && Array.isArray(parsed.customPrompts)
+        ? parsed.customPrompts
+        : parsed;
+
   if (!Array.isArray(payload)) {
     throw new Error('Import failed: expected an array of prompts or an object with a prompts array.');
   }
@@ -113,11 +128,20 @@ export function parsePromptImport(json: string): PromptTemplate[] {
     throw new Error('Import failed: no valid prompt templates were found.');
   }
 
-  return validPrompts.map((prompt) => ({
-    ...prompt,
-    isCustom: true,
-    updatedAt: new Date().toISOString(),
-  }));
+  const importedAt = Date.now();
+  return {
+    prompts: validPrompts.map((prompt, index) => {
+      const isSeedPrompt = prompt.id.startsWith('seed-');
+      return {
+        ...prompt,
+        id: isSeedPrompt ? `custom-import-${prompt.id}-${importedAt}-${index}` : prompt.id,
+        title: isSeedPrompt ? `${prompt.title} Import` : prompt.title,
+        isCustom: true,
+        updatedAt: new Date().toISOString(),
+      };
+    }),
+    favoriteIds,
+  };
 }
 
 export async function copyToClipboard(text: string): Promise<void> {
