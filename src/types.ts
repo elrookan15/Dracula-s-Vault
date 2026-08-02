@@ -11,7 +11,10 @@ export type PromptCategoryId =
   | 'creative'
   | 'marketing'
   | 'operations'
-  | 'gaming';
+  | 'gaming'
+  | 'security'
+  | 'poker'
+  | 'logic';
 
 export interface PromptCategory {
   id: PromptCategoryId;

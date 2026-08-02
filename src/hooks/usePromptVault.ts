@@ -11,15 +11,17 @@ interface StoredVault {
   favoriteIds: string[];
 }
 
-const emptyVault: StoredVault = {
+const defaultFavoriteIds = seedPrompts.filter((prompt) => prompt.isFavorite).map((prompt) => prompt.id);
+
+const initialVault: StoredVault = {
   customPrompts: [],
-  favoriteIds: [],
+  favoriteIds: defaultFavoriteIds,
 };
 
 function readStoredVault(storage: VaultStorage): StoredVault {
   const raw = storage.getItem(STORAGE_KEY);
   if (!raw) {
-    return emptyVault;
+    return initialVault;
   }
 
   try {
@@ -31,7 +33,7 @@ function readStoredVault(storage: VaultStorage): StoredVault {
         : [],
     };
   } catch {
-    return emptyVault;
+    return initialVault;
   }
 }
 
@@ -50,12 +52,12 @@ export function usePromptVault() {
   const prompts = useMemo<PromptTemplate[]>(() => {
     const seeded = seedPrompts.map((prompt) => ({
       ...prompt,
-      isFavorite: favoriteIdSet.has(prompt.id) || prompt.isFavorite,
+      isFavorite: favoriteIdSet.has(prompt.id),
     }));
 
     const custom = storedVault.customPrompts.map((prompt) => ({
       ...prompt,
-      isFavorite: favoriteIdSet.has(prompt.id) || prompt.isFavorite,
+      isFavorite: favoriteIdSet.has(prompt.id),
     }));
 
     return [...custom, ...seeded];
@@ -111,7 +113,8 @@ export function usePromptVault() {
     const imported = parsePromptImport(json);
     setStoredVault((current) => {
       const importedIds = new Set(imported.prompts.map((prompt) => prompt.id));
-      const nextFavorites = new Set([...current.favoriteIds, ...imported.favoriteIds]);
+      const importedFavorites = imported.prompts.filter((prompt) => prompt.isFavorite).map((prompt) => prompt.id);
+      const nextFavorites = new Set([...current.favoriteIds, ...imported.favoriteIds, ...importedFavorites]);
       const retained = current.customPrompts.filter((prompt) => !importedIds.has(prompt.id));
       return {
         customPrompts: [...imported.prompts, ...retained],

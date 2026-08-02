@@ -1,5 +1,5 @@
 import { Save, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { categories, modelTags } from '../data/seedPrompts';
 import type { PromptCategoryId, PromptFormValues, PromptTemplate } from '../types';
 
@@ -23,6 +23,7 @@ const emptyForm: PromptFormValues = {
 export function PromptEditorModal({ prompt, isOpen, onClose, onSave }: PromptEditorModalProps) {
   const [form, setForm] = useState<PromptFormValues>(emptyForm);
   const [tagInput, setTagInput] = useState('');
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (prompt) {
@@ -50,8 +51,15 @@ export function PromptEditorModal({ prompt, isOpen, onClose, onSave }: PromptEdi
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  /**
+   * Sandboxed frames without `allow-forms` never dispatch submit events, so the
+   * save button drives validation and persistence directly.
+   */
+  function handleSave() {
+    if (formRef.current && !formRef.current.reportValidity()) {
+      return;
+    }
+
     const tags = tagInput
       .split(',')
       .map((tag) => tag.trim().toLowerCase())
@@ -61,10 +69,16 @@ export function PromptEditorModal({ prompt, isOpen, onClose, onSave }: PromptEdi
     onClose();
   }
 
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    handleSave();
+  }
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
       <button className="absolute inset-0 cursor-default" type="button" aria-label="Close editor" onClick={onClose} />
       <form
+        ref={formRef}
         onSubmit={handleSubmit}
         className="glass-panel relative max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl p-5 shadow-2xl"
       >
@@ -180,7 +194,8 @@ export function PromptEditorModal({ prompt, isOpen, onClose, onSave }: PromptEdi
             Cancel
           </button>
           <button
-            type="submit"
+            type="button"
+            onClick={handleSave}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-vault-orange px-4 py-2.5 text-sm font-black text-white shadow-orange transition hover:bg-vault-orange-soft"
           >
             <Save className="h-4 w-4" aria-hidden="true" />
