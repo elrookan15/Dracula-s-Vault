@@ -84,6 +84,45 @@ export function detectSlop(text: string): string[] {
   return SLOP_PHRASES.filter((phrase) => lower.includes(phrase));
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export interface SlopSpan {
+  text: string;
+  slop: boolean;
+}
+
+/**
+ * Splits text into ordered segments, flagging spans that match a slop phrase.
+ * Word boundaries prevent partial matches (e.g. "delve" inside "delved").
+ */
+export function findSlopSpans(text: string): SlopSpan[] {
+  const pattern = new RegExp(`\\b(?:${SLOP_PHRASES.map(escapeRegExp).join('|')})\\b`, 'gi');
+  const spans: SlopSpan[] = [];
+  let lastIndex = 0;
+
+  for (const match of text.matchAll(pattern)) {
+    const index = match.index ?? 0;
+    if (index > lastIndex) {
+      spans.push({ text: text.slice(lastIndex, index), slop: false });
+    }
+    spans.push({ text: match[0], slop: true });
+    lastIndex = index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    spans.push({ text: text.slice(lastIndex), slop: false });
+  }
+
+  return spans;
+}
+
+/** Builds the negative constraint appended when a user bans a slop phrase. */
+export function buildSlopConstraint(phrase: string): string {
+  return `Never use the word or phrase "${phrase.trim().toLowerCase()}".`;
+}
+
 export interface HallucinationOptions {
   requireCitations: boolean;
   restrictToContext: boolean;

@@ -11,7 +11,7 @@ PromptVault Studio is a fully client-side single-page app (React + TypeScript + 
 - 14 preloaded prompt categories and production templates.
 - Live multi-dimensional search, category counts, and model filtering.
 - Dynamic variable engine supporting both `[VARIABLE_NAME]` and `{{variable}}`.
-- Two builders: the Architecture Lab (7-pass guided builder) and the 13-tool Prompt Studio.
+- Two builders: the Architecture Lab (7-pass guided builder) and the 14-tool Prompt Studio.
 - Bring-Your-Own-Key live model execution with encrypted-at-rest keys.
 - Local-first persistence, JSON backup/restore, and a sandbox-safe fallback.
 - 62 unit tests and GitHub Actions CI.
@@ -35,7 +35,7 @@ Prompts use bracketed or braced tokens — both **`[VARIABLE_NAME]`** and **`{{v
 
 **Architecture Lab** — a guided **7-pass prompt builder** (Identity → Tone → Objective → Context → Structure → Constraints → Logic) with **branch snapshots** (V1, V2, …) so you can fork a design and refine alternate strategies without losing the original.
 
-**Prompt Studio** — a per-prompt workspace with a **persistent Token/Cost/Context HUD** (heuristic token estimate, per-provider cost estimate, and a context-window meter that recomputes as you switch models) and **13 tools**:
+**Prompt Studio** — a per-prompt workspace with a **persistent Token/Cost/Context HUD** (heuristic token estimate, per-provider cost estimate, and a context-window meter that recomputes as you switch models) and **14 tools**:
 
 | Tool | What it does |
 | --- | --- |
@@ -47,7 +47,8 @@ Prompts use bracketed or braced tokens — both **`[VARIABLE_NAME]`** and **`{{v
 | Persona | Authority/jargon sliders + tone to generate a persona block |
 | Few-shot | Builds reorderable input/output examples in JSON, YAML, or Markdown |
 | Pipeline | Sequences a multi-pass workflow (e.g. audit → optimize → refactor) |
-| Sandbox | Runs a chat turn — simulated, or live against a real model |
+| Sandbox | Runs a chat turn — simulated, or live against a real model; highlights "slop" words in the response so you can one-click ban them via a guardrail |
+| Arena | Runs the prompt across multiple models concurrently (BYOK) with side-by-side outputs and an optional diff vs a baseline model |
 | Versions | Git-style line diff of the working canvas vs. the original |
 | Evaluate | LLM-as-judge-style rubric scoring five gates into a letter grade |
 | Compress | Dedupes and bulletizes to tighten context |
