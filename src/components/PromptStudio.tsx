@@ -829,7 +829,7 @@ function SandboxTab({ workingText, variables }: { workingText: string; variables
           value={userMessage}
           onChange={(event) => setUserMessage(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter') {
+            if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
               send();
             }
           }}
