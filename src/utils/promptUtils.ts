@@ -2,9 +2,29 @@ import { categories, modelTags } from '../data/seedPrompts';
 import type { ModelTag, PromptCategoryId, PromptFormValues, PromptTemplate } from '../types';
 
 export const VARIABLE_PATTERN = /\[([A-Z0-9_]+)\]/g;
+/** Matches either `[VARIABLE_NAME]` or `{{variable}}` tokens. */
+export const COMBINED_VARIABLE_PATTERN = /\[([A-Z0-9_]+)\]|\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
 
 const categoryIds = new Set(categories.map((category) => category.id));
 const modelTagSet = new Set<ModelTag>(modelTags);
+
+interface VariableMatch {
+  name: string;
+  raw: string;
+  index: number;
+}
+
+function iterateVariableMatches(prompt: string): VariableMatch[] {
+  const matches: VariableMatch[] = [];
+  for (const match of prompt.matchAll(COMBINED_VARIABLE_PATTERN)) {
+    const name = match[1] ?? match[2];
+    if (!name) {
+      continue;
+    }
+    matches.push({ name, raw: match[0], index: match.index ?? 0 });
+  }
+  return matches;
+}
 
 /** `crypto.randomUUID` is unavailable over plain HTTP and in older engines. */
 export function createId(prefix: string): string {
@@ -22,16 +42,17 @@ export function createId(prefix: string): string {
 
 export function extractVariables(prompt: string): string[] {
   const variables = new Set<string>();
-  for (const match of prompt.matchAll(VARIABLE_PATTERN)) {
-    variables.add(match[1]);
+  for (const match of iterateVariableMatches(prompt)) {
+    variables.add(match.name);
   }
   return [...variables].sort((a, b) => a.localeCompare(b));
 }
 
 export function interpolatePrompt(prompt: string, values: Record<string, string>): string {
-  return prompt.replace(VARIABLE_PATTERN, (match, variable: string) => {
-    const value = values[variable]?.trim();
-    return value ? value : match;
+  return prompt.replace(COMBINED_VARIABLE_PATTERN, (raw, bracket: string | undefined, curly: string | undefined) => {
+    const name = bracket ?? curly;
+    const value = name ? values[name]?.trim() : undefined;
+    return value ? value : raw;
   });
 }
 
@@ -39,16 +60,14 @@ export function highlightedPromptParts(prompt: string, values: Record<string, st
   const parts: Array<{ text: string; kind: 'static' | 'variable' | 'value' }> = [];
   let lastIndex = 0;
 
-  for (const match of prompt.matchAll(VARIABLE_PATTERN)) {
-    const index = match.index ?? 0;
-    if (index > lastIndex) {
-      parts.push({ text: prompt.slice(lastIndex, index), kind: 'static' });
+  for (const match of iterateVariableMatches(prompt)) {
+    if (match.index > lastIndex) {
+      parts.push({ text: prompt.slice(lastIndex, match.index), kind: 'static' });
     }
 
-    const variable = match[1];
-    const value = values[variable]?.trim();
-    parts.push({ text: value || match[0], kind: value ? 'value' : 'variable' });
-    lastIndex = index + match[0].length;
+    const value = values[match.name]?.trim();
+    parts.push({ text: value || match.raw, kind: value ? 'value' : 'variable' });
+    lastIndex = match.index + match.raw.length;
   }
 
   if (lastIndex < prompt.length) {

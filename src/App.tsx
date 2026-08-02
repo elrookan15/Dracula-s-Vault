@@ -5,6 +5,7 @@ import { CategorySidebar } from './components/CategorySidebar';
 import { Header } from './components/Header';
 import { PromptCard } from './components/PromptCard';
 import { PromptEditorModal } from './components/PromptEditorModal';
+import { PromptStudio } from './components/PromptStudio';
 import { VariableModal } from './components/VariableModal';
 import { categories, modelTags } from './data/seedPrompts';
 import { usePromptVault } from './hooks/usePromptVault';
@@ -23,6 +24,7 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState<PromptCategoryId | 'all'>('all');
   const [selectedModel, setSelectedModel] = useState<ModelTag | 'all'>('all');
   const [executingPrompt, setExecutingPrompt] = useState<PromptTemplate | null>(null);
+  const [studioPrompt, setStudioPrompt] = useState<PromptTemplate | null>(null);
   const [editingPrompt, setEditingPrompt] = useState<PromptTemplate | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -100,6 +102,20 @@ function App() {
   function handleDelete(promptId: string) {
     deletePrompt(promptId);
     showToast('Custom prompt deleted.');
+  }
+
+  function handleStudioSaveFork(title: string, promptText: string, model: ModelTag) {
+    const source = studioPrompt;
+    savePrompt({
+      title,
+      categoryId: source?.categoryId ?? 'writing',
+      model,
+      description: source?.description ?? 'Refined in Prompt Studio.',
+      framework: source?.framework ?? 'Custom',
+      prompt: promptText,
+      tags: source?.tags ?? [],
+    });
+    showToast('Saved studio draft as a new custom prompt.');
   }
 
   function handleExport() {
@@ -209,6 +225,7 @@ function App() {
                         prompt={prompt}
                         category={category}
                         onExecute={setExecutingPrompt}
+                        onStudio={setStudioPrompt}
                         onEdit={(target) => {
                           setEditingPrompt(target);
                           setIsEditorOpen(true);
@@ -240,6 +257,14 @@ function App() {
         isOpen={Boolean(executingPrompt)}
         onClose={() => setExecutingPrompt(null)}
         onCopy={handleCopy}
+      />
+
+      <PromptStudio
+        prompt={studioPrompt}
+        isOpen={Boolean(studioPrompt)}
+        onClose={() => setStudioPrompt(null)}
+        onCopy={handleCopy}
+        onSaveFork={handleStudioSaveFork}
       />
 
       <PromptEditorModal

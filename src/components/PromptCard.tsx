@@ -1,4 +1,4 @@
-import { Copy, GitFork, Pencil, Play, Star, Trash2, Variable } from 'lucide-react';
+import { Copy, GitFork, Pencil, Play, SlidersHorizontal, Star, Trash2, Variable } from 'lucide-react';
 import type { PromptCategory, PromptTemplate } from '../types';
 import { extractVariables } from '../utils/promptUtils';
 
@@ -6,6 +6,7 @@ interface PromptCardProps {
   prompt: PromptTemplate;
   category: PromptCategory;
   onExecute: (prompt: PromptTemplate) => void;
+  onStudio: (prompt: PromptTemplate) => void;
   onEdit: (prompt: PromptTemplate) => void;
   onFork: (prompt: PromptTemplate) => void;
   onFavorite: (promptId: string) => void;
@@ -23,6 +24,7 @@ export function PromptCard({
   prompt,
   category,
   onExecute,
+  onStudio,
   onEdit,
   onFork,
   onFavorite,
@@ -97,6 +99,14 @@ export function PromptCard({
         >
           <Copy className="h-4 w-4" aria-hidden="true" />
           Copy
+        </button>
+        <button
+          type="button"
+          onClick={() => onStudio(prompt)}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-vault-purple/40 bg-vault-purple/10 px-3 py-2.5 text-sm font-black text-vault-purple-soft transition hover:bg-vault-purple/15"
+        >
+          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+          Studio
         </button>
         <button
           type="button"

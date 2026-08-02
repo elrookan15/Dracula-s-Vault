@@ -10,6 +10,9 @@ PromptVault Studio is a dark, cyber-professional React SPA for managing, searchi
 - Dynamic variable engine for `[VARIABLE_NAME]` tokens with real-time interpolation.
 - Copy, fork, favorite, create, edit, delete, JSON import, and JSON export workflows.
 - Architecture Lab with a guided 7-pass prompt engineering builder and branch snapshots.
+- Prompt Studio workspace with 13 tools: framework scaffolding (RTCC/CRISPE/STCO/TCREI/ReAct/ToT), XML structural tagging, meta-prompt self-refinement, multi-model translation (Claude/OpenAI/Gemini/Ollama), anti-slop and hallucination guardrails, persona calibration, few-shot builder, multi-pass pipeline, a mock test sandbox, version diffing, an LLM-as-judge quality rubric, context compression, and multi-format/agent-file export.
+- Token counter + cost/context-window HUD with per-model estimates.
+- Variable engine supporting both `[VARIABLE_NAME]` and `{{variable}}` syntaxes.
 - LocalStorage persistence with guarded JSON import validation, falling back to in-memory session state when a sandboxed origin blocks storage.
 - Responsive dark UI using Vite, React, TypeScript, Tailwind CSS, and lucide-react.
 
