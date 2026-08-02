@@ -27,6 +27,12 @@ npm run dev
 ## Validation
 
 ```bash
-npm run lint
-npm run build
+npm run lint    # TypeScript typecheck
+npm test        # Vitest unit tests
+npm run build   # production build
 ```
+
+Unit tests live next to the code as `src/**/*.test.ts` and cover the pure logic
+(variable interpolation, tokenizer, diffing, evaluation rubric, YAML escaping,
+exporters, translators, provider routing/calls, and encrypted key storage).
+CI runs typecheck, tests, and build on every pull request via GitHub Actions.
