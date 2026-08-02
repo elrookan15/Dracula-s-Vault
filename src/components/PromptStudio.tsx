@@ -15,6 +15,7 @@ import {
   Save,
   ShieldAlert,
   Sparkles,
+  Swords,
   Trash2,
   UserCog,
   Wand2,
@@ -40,7 +41,9 @@ import {
   buildAntiSlopBlock,
   buildHallucinationBlock,
   buildMetaPrompt,
+  buildSlopConstraint,
   compressPrompt,
+  findSlopSpans,
   scaffoldXmlStructure,
   wrapInXmlTag,
   XML_TAGS,
@@ -56,6 +59,7 @@ import {
 } from '../utils/providers';
 import { createId, extractVariables, interpolatePrompt } from '../utils/promptUtils';
 import { translatePrompt, translationTargets, type TargetFormat } from '../utils/translators';
+import { modelTags } from '../data/seedPrompts';
 import { TokenHud } from './studio/TokenHud';
 
 type StudioTab =
@@ -68,6 +72,7 @@ type StudioTab =
   | 'fewshot'
   | 'pipeline'
   | 'sandbox'
+  | 'arena'
   | 'versions'
   | 'evaluate'
   | 'compress'
@@ -89,6 +94,7 @@ const tabs: TabDefinition[] = [
   { id: 'fewshot', label: 'Few-Shot', icon: ListOrdered },
   { id: 'pipeline', label: 'Pipeline', icon: Workflow },
   { id: 'sandbox', label: 'Sandbox', icon: Wand2 },
+  { id: 'arena', label: 'Arena', icon: Swords },
   { id: 'versions', label: 'Versions', icon: GitCompare },
   { id: 'evaluate', label: 'Evaluate', icon: Gauge },
   { id: 'compress', label: 'Compress', icon: Minimize2 },
@@ -213,6 +219,15 @@ export function PromptStudio({ prompt, isOpen, apiSettings, onClose, onCopy, onS
                 variables={variables}
                 model={model}
                 settings={apiSettings}
+                onOpenSettings={onOpenSettings}
+                onAddGuardrail={(phrase) => append(buildSlopConstraint(phrase))}
+              />
+            )}
+            {activeTab === 'arena' && (
+              <ArenaTab
+                workingText={workingText}
+                settings={apiSettings}
+                onCopy={onCopy}
                 onOpenSettings={onOpenSettings}
               />
             )}
@@ -784,18 +799,30 @@ function SandboxTab({
   model,
   settings,
   onOpenSettings,
+  onAddGuardrail,
 }: {
   workingText: string;
   variables: string[];
   model: ModelTag;
   settings: ApiSettings;
   onOpenSettings: () => void;
+  onAddGuardrail: (phrase: string) => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [userMessage, setUserMessage] = useState('');
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [liveMode, setLiveMode] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [bannedPhrases, setBannedPhrases] = useState<string[]>([]);
+
+  function banPhrase(phrase: string) {
+    const normalized = phrase.toLowerCase();
+    if (bannedPhrases.includes(normalized)) {
+      return;
+    }
+    setBannedPhrases((current) => [...current, normalized]);
+    onAddGuardrail(phrase);
+  }
 
   const systemPrompt = useMemo(() => interpolatePrompt(workingText, values), [workingText, values]);
   const provider = providerForModel(model);
@@ -853,7 +880,8 @@ function SandboxTab({
         <h3 className="text-lg font-black text-white">Test Sandbox</h3>
         <p className="text-sm text-slate-400">
           Send a chat turn against the canvas system prompt. Simulated by default; enable Live mode to call the real
-          provider with your saved key.
+          provider with your saved key. Slop words in the response are highlighted — click one to ban it via a
+          guardrail.
         </p>
       </div>
 
@@ -914,11 +942,39 @@ function SandboxTab({
             }`}
           >
             <span className="mr-2 text-xs font-black uppercase">{turn.role}</span>
-            <span className="whitespace-pre-wrap">{turn.content}</span>
+            {turn.role === 'assistant' ? (
+              <span className="whitespace-pre-wrap">
+                {findSlopSpans(turn.content).map((span, spanIndex) =>
+                  span.slop ? (
+                    <button
+                      key={spanIndex}
+                      type="button"
+                      onClick={() => banPhrase(span.text)}
+                      title={`Ban "${span.text}" — appends a guardrail to the canvas`}
+                      className="rounded bg-vault-orange/20 px-0.5 font-bold text-vault-orange-soft underline decoration-dotted underline-offset-2 transition hover:bg-vault-orange/30"
+                    >
+                      {span.text}
+                    </button>
+                  ) : (
+                    <span key={spanIndex}>{span.text}</span>
+                  ),
+                )}
+              </span>
+            ) : (
+              <span className="whitespace-pre-wrap">{turn.content}</span>
+            )}
           </div>
         ))}
         {isRunning && <p className="px-3 text-sm text-slate-500">Calling {providerMeta[provider].label}…</p>}
       </div>
+
+      {bannedPhrases.length > 0 && (
+        <p className="text-xs text-slate-500">
+          Added guardrails for: {bannedPhrases.map((phrase) => `"${phrase}"`).join(', ')}. Click any highlighted
+          <span className="mx-1 rounded bg-vault-orange/20 px-1 font-bold text-vault-orange-soft">slop</span>
+          word to ban it.
+        </p>
+      )}
 
       <div className="flex gap-2">
         <input
@@ -935,6 +991,249 @@ function SandboxTab({
         <button type="button" className={primaryButton} onClick={send} disabled={isRunning}>
           {isRunning ? 'Running…' : 'Send'}
         </button>
+      </div>
+    </div>
+  );
+}
+
+type ArenaStatus = 'idle' | 'running' | 'done' | 'error';
+
+interface ArenaResult {
+  status: ArenaStatus;
+  text: string;
+}
+
+function ArenaTab({
+  workingText,
+  settings,
+  onCopy,
+  onOpenSettings,
+}: {
+  workingText: string;
+  settings: ApiSettings;
+  onCopy: (text: string) => void;
+  onOpenSettings: () => void;
+}) {
+  const availableModels = useMemo(() => modelTags.filter((model) => hasCredential(model, settings)), [settings]);
+  const [selected, setSelected] = useState<ModelTag[]>([]);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [userMessage, setUserMessage] = useState('');
+  const [results, setResults] = useState<Record<string, ArenaResult>>({});
+  const [running, setRunning] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
+
+  const variables = useMemo(() => extractVariables(workingText), [workingText]);
+  const systemPrompt = useMemo(() => interpolatePrompt(workingText, values), [workingText, values]);
+
+  // Default the selection to every model that has a key, once keys are known.
+  useEffect(() => {
+    setSelected((current) => {
+      const stillValid = current.filter((model) => availableModels.includes(model));
+      return stillValid.length > 0 ? stillValid : availableModels.slice(0, 3);
+    });
+  }, [availableModels]);
+
+  const baseline = selected.find((model) => results[model]?.status === 'done');
+
+  function toggleModel(model: ModelTag) {
+    setSelected((current) =>
+      current.includes(model) ? current.filter((entry) => entry !== model) : [...current, model],
+    );
+  }
+
+  async function runArena() {
+    const targets = selected.filter((model) => hasCredential(model, settings));
+    if (targets.length === 0 || running) {
+      return;
+    }
+
+    setRunning(true);
+    setResults(Object.fromEntries(targets.map((model) => [model, { status: 'running', text: '' }])));
+
+    const message: ChatMessage = { role: 'user', content: userMessage.trim() || '[USER_INPUT]' };
+
+    await Promise.allSettled(
+      targets.map(async (model) => {
+        try {
+          const text = await runChat({ model, system: systemPrompt, messages: [message], settings });
+          setResults((current) => ({ ...current, [model]: { status: 'done', text } }));
+        } catch (error) {
+          setResults((current) => ({
+            ...current,
+            [model]: { status: 'error', text: error instanceof Error ? error.message : 'Request failed.' },
+          }));
+        }
+      }),
+    );
+
+    setRunning(false);
+  }
+
+  if (availableModels.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-lg font-black text-white">Multi-Model Arena</h3>
+          <p className="text-sm text-slate-400">Run one prompt across several models at once and compare the outputs.</p>
+        </div>
+        <div className="rounded-2xl border border-vault-orange/40 bg-vault-orange/10 p-4 text-sm text-vault-orange-soft">
+          No API keys are configured yet. Add at least one provider key to run the Arena.
+          <button type="button" onClick={onOpenSettings} className="ml-1 font-black underline decoration-dotted">
+            Open Settings
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-lg font-black text-white">Multi-Model Arena</h3>
+        <p className="text-sm text-slate-400">
+          Run the canvas prompt across every selected model concurrently, then compare outputs side by side.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {modelTags.map((model) => {
+          const ready = availableModels.includes(model);
+          const active = selected.includes(model);
+          return (
+            <button
+              key={model}
+              type="button"
+              disabled={!ready}
+              onClick={() => toggleModel(model)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${
+                active
+                  ? 'border-vault-lime bg-vault-lime/15 text-vault-lime'
+                  : ready
+                    ? 'border-vault-border text-slate-300 hover:border-vault-lime'
+                    : 'cursor-not-allowed border-vault-border text-slate-600'
+              }`}
+              title={ready ? `${providerMeta[providerForModel(model)].label}` : 'No API key — add one in Settings'}
+            >
+              {model}
+              {!ready && ' · no key'}
+            </button>
+          );
+        })}
+      </div>
+
+      {variables.length > 0 && (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {variables.map((variable) => (
+            <label key={variable} className="block">
+              <span className="mb-1 block font-mono text-xs font-black text-vault-purple-soft">{variable}</span>
+              <input
+                value={values[variable] ?? ''}
+                onChange={(event) => setValues((current) => ({ ...current, [variable]: event.target.value }))}
+                className="w-full rounded-lg border border-vault-border bg-vault-surface px-2 py-1.5 text-sm text-slate-100 focus:border-vault-purple"
+              />
+            </label>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={userMessage}
+          onChange={(event) => setUserMessage(event.target.value)}
+          placeholder="User message (optional)…"
+          className="min-w-48 flex-1 rounded-xl border border-vault-border bg-vault-surface px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-vault-orange"
+        />
+        <label className="flex items-center gap-2 text-sm font-bold text-slate-200">
+          <input
+            type="checkbox"
+            checked={showDiff}
+            onChange={(event) => setShowDiff(event.target.checked)}
+            className="h-4 w-4 accent-vault-purple"
+          />
+          Diff vs baseline
+        </label>
+        <button
+          type="button"
+          className={primaryButton}
+          onClick={runArena}
+          disabled={running || selected.length === 0}
+        >
+          <Swords className="h-4 w-4" aria-hidden="true" />
+          {running ? 'Running…' : `Run ${selected.length || ''} model${selected.length === 1 ? '' : 's'}`}
+        </button>
+      </div>
+
+      {showDiff && baseline && (
+        <p className="text-xs text-slate-500">
+          Showing line diffs against <span className="font-black text-vault-lime">{baseline}</span> (baseline).
+        </p>
+      )}
+
+      <div className="flex gap-3 overflow-x-auto pb-2">
+        {selected.map((model) => {
+          const result = results[model];
+          const isBaseline = model === baseline;
+          const diff = showDiff && baseline && !isBaseline && result?.status === 'done' && results[baseline]?.status === 'done'
+            ? diffLines(results[baseline].text, result.text)
+            : null;
+
+          return (
+            <div key={model} className="flex min-w-[260px] flex-1 flex-col rounded-2xl border border-vault-border bg-vault-surface/70 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black text-white">{model}</p>
+                  <p className="text-xs text-slate-500">{providerMeta[providerForModel(model)].label}</p>
+                </div>
+                {result?.status === 'done' && (
+                  <button
+                    type="button"
+                    onClick={() => onCopy(result.text)}
+                    className="rounded-lg border border-vault-border p-1.5 text-slate-400 transition hover:border-vault-lime hover:text-vault-lime"
+                    aria-label={`Copy ${model} output`}
+                  >
+                    <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+
+              {isBaseline && showDiff && (
+                <span className="mb-2 self-start rounded-full bg-vault-lime/10 px-2 py-0.5 text-[10px] font-black uppercase text-vault-lime">
+                  baseline
+                </span>
+              )}
+
+              <div className="min-h-24 flex-1 overflow-y-auto rounded-xl bg-black/20 p-2 font-mono text-xs leading-6">
+                {!result || result.status === 'idle' ? (
+                  <span className="text-slate-600">Not run yet.</span>
+                ) : result.status === 'running' ? (
+                  <span className="text-slate-500">Calling {providerMeta[providerForModel(model)].label}…</span>
+                ) : result.status === 'error' ? (
+                  <span className="text-red-300">{result.text}</span>
+                ) : diff ? (
+                  diff.map((line, index) => (
+                    <div
+                      key={index}
+                      className={
+                        line.kind === 'added'
+                          ? 'bg-vault-lime/10 text-vault-lime'
+                          : line.kind === 'removed'
+                            ? 'bg-red-500/10 text-red-300'
+                            : 'text-slate-300'
+                      }
+                    >
+                      <span className="mr-1 select-none opacity-60">
+                        {line.kind === 'added' ? '+' : line.kind === 'removed' ? '-' : ' '}
+                      </span>
+                      {line.text || '\u00A0'}
+                    </div>
+                  ))
+                ) : (
+                  <span className="whitespace-pre-wrap text-slate-200">{result.text}</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
