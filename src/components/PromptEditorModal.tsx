@@ -69,7 +69,7 @@ export function PromptEditorModal({ prompt, isOpen, onClose, onSave }: PromptEdi
     onClose();
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+function handleSubmit(event: import('react').FormEvent<HTMLFormElement>) {
     event.preventDefault();
     handleSave();
   }
