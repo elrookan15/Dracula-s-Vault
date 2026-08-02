@@ -131,7 +131,7 @@ export function usePromptVault() {
         version: 1,
         exportedAt: new Date().toISOString(),
         favoriteIds: storedVault.favoriteIds,
-        prompts,
+        prompts: storedVault.customPrompts,
       },
       null,
       2,

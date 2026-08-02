@@ -1,5 +1,5 @@
 import { AlertCircle, CheckCircle2, Flame, LibraryBig, SlidersHorizontal, Terminal } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ArchitectureLab } from './components/ArchitectureLab';
 import { CategorySidebar } from './components/CategorySidebar';
 import { Header } from './components/Header';
@@ -9,7 +9,7 @@ import { VariableModal } from './components/VariableModal';
 import { categories, modelTags } from './data/seedPrompts';
 import { usePromptVault } from './hooks/usePromptVault';
 import type { ModelTag, PromptCategoryId, PromptFormValues, PromptTemplate } from './types';
-import { copyToClipboard, extractVariables } from './utils/promptUtils';
+import { copyToClipboard, downloadJson, extractVariables } from './utils/promptUtils';
 
 interface ToastState {
   message: string;
@@ -26,6 +26,7 @@ function App() {
   const [editingPrompt, setEditingPrompt] = useState<PromptTemplate | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
 
   const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category])), []);
 
@@ -71,7 +72,10 @@ function App() {
 
   function showToast(message: string, tone: ToastState['tone'] = 'success') {
     setToast({ message, tone });
-    window.setTimeout(() => setToast(null), 3000);
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 3000);
   }
 
   async function handleCopy(text: string) {
@@ -99,13 +103,7 @@ function App() {
   }
 
   function handleExport() {
-    const blob = new Blob([exportVault()], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `promptvault-studio-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadJson(`promptvault-studio-backup-${new Date().toISOString().slice(0, 10)}.json`, exportVault());
     showToast('Vault backup exported.');
   }
 

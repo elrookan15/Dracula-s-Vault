@@ -157,6 +157,18 @@ export function parsePromptImport(json: string): PromptImportResult {
   };
 }
 
+export function downloadJson(filename: string, contents: string): void {
+  const blob = new Blob([contents], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /** Sandboxed frames often reject the async clipboard, so fall back to a selection copy. */
 function copyViaSelection(text: string): boolean {
   const textarea = document.createElement('textarea');

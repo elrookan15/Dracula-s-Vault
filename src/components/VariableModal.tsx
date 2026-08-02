@@ -1,7 +1,7 @@
 import { Copy, Download, X, Zap } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { PromptTemplate } from '../types';
-import { extractVariables, highlightedPromptParts, interpolatePrompt } from '../utils/promptUtils';
+import { extractVariables, highlightedPromptParts, interpolatePrompt, downloadJson } from '../utils/promptUtils';
 
 interface VariableModalProps {
   prompt: PromptTemplate | null;
@@ -42,13 +42,7 @@ export function VariableModal({ prompt, isOpen, onClose, onCopy }: VariableModal
       null,
       2,
     );
-    const blob = new Blob([payload], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${activePrompt.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-execution.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadJson(`${activePrompt.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-execution.json`, payload);
   }
 
   return (
