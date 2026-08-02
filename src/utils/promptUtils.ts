@@ -6,6 +6,20 @@ export const VARIABLE_PATTERN = /\[([A-Z0-9_]+)\]/g;
 const categoryIds = new Set(categories.map((category) => category.id));
 const modelTagSet = new Set<ModelTag>(modelTags);
 
+/** `crypto.randomUUID` is unavailable over plain HTTP and in older engines. */
+export function createId(prefix: string): string {
+  try {
+    const uuid = globalThis.crypto?.randomUUID?.();
+    if (uuid) {
+      return `${prefix}-${uuid}`;
+    }
+  } catch {
+    // Fall through to the entropy-based identifier below.
+  }
+
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function extractVariables(prompt: string): string[] {
   const variables = new Set<string>();
   for (const match of prompt.matchAll(VARIABLE_PATTERN)) {
@@ -53,7 +67,7 @@ export function createPromptFromValues(values: PromptFormValues, existing?: Prom
     .slice(0, 48);
 
   return {
-    id: existing?.id ?? `custom-${baseId || 'prompt'}-${Date.now()}`,
+    id: existing?.id ?? createId(`custom-${baseId || 'prompt'}`),
     ...values,
     tags: values.tags.map((tag) => tag.trim()).filter(Boolean),
     isFavorite: existing?.isFavorite ?? false,
@@ -128,13 +142,12 @@ export function parsePromptImport(json: string): PromptImportResult {
     throw new Error('Import failed: no valid prompt templates were found.');
   }
 
-  const importedAt = Date.now();
   return {
-    prompts: validPrompts.map((prompt, index) => {
+    prompts: validPrompts.map((prompt) => {
       const isSeedPrompt = prompt.id.startsWith('seed-');
       return {
         ...prompt,
-        id: isSeedPrompt ? `custom-import-${prompt.id}-${importedAt}-${index}` : prompt.id,
+        id: isSeedPrompt ? createId(`custom-import-${prompt.id}`) : prompt.id,
         title: isSeedPrompt ? `${prompt.title} Import` : prompt.title,
         isCustom: true,
         updatedAt: new Date().toISOString(),
@@ -144,10 +157,36 @@ export function parsePromptImport(json: string): PromptImportResult {
   };
 }
 
+/** Sandboxed frames often reject the async clipboard, so fall back to a selection copy. */
+function copyViaSelection(text: string): boolean {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', 'true');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  try {
+    return document.execCommand('copy');
+  } catch {
+    return false;
+  } finally {
+    document.body.removeChild(textarea);
+  }
+}
+
 export async function copyToClipboard(text: string): Promise<void> {
-  if (!navigator.clipboard?.writeText) {
-    throw new Error('Clipboard API is unavailable in this browser.');
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+  } catch {
+    // Permission-blocked clipboard access retries through the selection path.
   }
 
-  await navigator.clipboard.writeText(text);
+  if (!copyViaSelection(text)) {
+    throw new Error('Clipboard access is blocked here. Use Export to save the prompt instead.');
+  }
 }

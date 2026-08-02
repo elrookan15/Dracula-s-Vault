@@ -1,6 +1,7 @@
 import { GitBranch, Layers3, Plus, Sparkles } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { LabBranch } from '../types';
+import { createId } from '../utils/promptUtils';
 
 const labSteps = [
   { id: 'identity', label: 'Identity', prompt: 'Role, seniority, and expertise' },
@@ -31,7 +32,7 @@ export function ArchitectureLab() {
 
   function forkBranch() {
     const nextBranch: LabBranch = {
-      id: `branch-${Date.now()}`,
+      id: createId('branch'),
       name: `V${branches.length + 1}`,
       values,
       createdAt: new Date().toISOString(),

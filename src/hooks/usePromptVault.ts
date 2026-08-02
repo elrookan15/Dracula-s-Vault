@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { seedPrompts } from '../data/seedPrompts';
 import type { PromptFormValues, PromptTemplate } from '../types';
-import { createPromptFromValues, isPromptTemplate, parsePromptImport } from '../utils/promptUtils';
+import { createId, createPromptFromValues, isPromptTemplate, parsePromptImport } from '../utils/promptUtils';
+import { createVaultStorage, type VaultStorage } from '../utils/safeStorage';
 
 const STORAGE_KEY = 'promptvault-studio:vault';
 
@@ -15,8 +16,8 @@ const emptyVault: StoredVault = {
   favoriteIds: [],
 };
 
-function readStoredVault(): StoredVault {
-  const raw = localStorage.getItem(STORAGE_KEY);
+function readStoredVault(storage: VaultStorage): StoredVault {
+  const raw = storage.getItem(STORAGE_KEY);
   if (!raw) {
     return emptyVault;
   }
@@ -35,12 +36,16 @@ function readStoredVault(): StoredVault {
 }
 
 export function usePromptVault() {
-  const [storedVault, setStoredVault] = useState<StoredVault>(() => readStoredVault());
+  const storageRef = useRef<VaultStorage | null>(null);
+  storageRef.current ??= createVaultStorage();
+  const storage = storageRef.current;
+
+  const [storedVault, setStoredVault] = useState<StoredVault>(() => readStoredVault(storage));
   const favoriteIdSet = useMemo(() => new Set(storedVault.favoriteIds), [storedVault.favoriteIds]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(storedVault));
-  }, [storedVault]);
+    storage.setItem(STORAGE_KEY, JSON.stringify(storedVault));
+  }, [storage, storedVault]);
 
   const prompts = useMemo<PromptTemplate[]>(() => {
     const seeded = seedPrompts.map((prompt) => ({
@@ -90,7 +95,7 @@ export function usePromptVault() {
     const timestamp = new Date().toISOString();
     const forked: PromptTemplate = {
       ...prompt,
-      id: `custom-fork-${Date.now()}`,
+      id: createId('custom-fork'),
       title: `${prompt.title} Fork`,
       isCustom: true,
       isFavorite: false,
@@ -132,6 +137,7 @@ export function usePromptVault() {
 
   return {
     prompts,
+    isPersistent: storage.isPersistent,
     toggleFavorite,
     savePrompt,
     deletePrompt,

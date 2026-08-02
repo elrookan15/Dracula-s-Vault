@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Flame, LibraryBig, SlidersHorizontal } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Flame, LibraryBig, SlidersHorizontal, Terminal } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ArchitectureLab } from './components/ArchitectureLab';
 import { CategorySidebar } from './components/CategorySidebar';
@@ -17,7 +17,8 @@ interface ToastState {
 }
 
 function App() {
-  const { prompts, toggleFavorite, savePrompt, deletePrompt, forkPrompt, importPrompts, exportVault } = usePromptVault();
+  const { prompts, isPersistent, toggleFavorite, savePrompt, deletePrompt, forkPrompt, importPrompts, exportVault } =
+    usePromptVault();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<PromptCategoryId | 'all'>('all');
   const [selectedModel, setSelectedModel] = useState<ModelTag | 'all'>('all');
@@ -134,6 +135,16 @@ function App() {
       />
 
       <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        {!isPersistent ? (
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-vault-orange/40 bg-vault-orange/10 px-4 py-3">
+            <Terminal className="mt-0.5 h-5 w-5 shrink-0 text-vault-orange" aria-hidden="true" />
+            <p className="text-sm leading-6 text-vault-orange-soft">
+              <span className="font-black text-white">Session-only mode.</span> Browser storage is blocked in this
+              environment, so the vault runs in memory. Use Export to save your prompts and Import to restore them.
+            </p>
+          </div>
+        ) : null}
+
         <div className="mb-6 grid gap-4 md:grid-cols-3">
           <div className="glass-panel rounded-3xl p-5">
             <div className="mb-3 flex items-center justify-between">
